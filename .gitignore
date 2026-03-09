@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# environment variables
+.env
+.env.*
+
+# build output
+dist/
+build/
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# coverage
+coverage/
+
+# OS files
+.DS_Store
+
+# prisma generated files
+/generated/prisma

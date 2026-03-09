@@ -1,0 +1,114 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// 1. Tabel User (Untuk Login Admin & Siswa)
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  role      Role     @default(STUDENT) // ADMIN, STUDENT, TREASURER
+  student   Student? // Relasi ke data siswa jika role-nya STUDENT
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+  TREASURER
+}
+
+// 2. Tabel Siswa
+model Student {
+  id          Int       @id @default(autoincrement())
+  userId      Int?      @unique
+  user        User?     @relation(fields: [userId], references: [id])
+  nisn        String    @unique
+  name        String
+  class       String
+  phone       String?   // Penting untuk kirim notifikasi WhatsApp
+  address     String?   @db.Text
+  isActive    Boolean   @default(true)
+  invoices    Invoice[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// 3. Tabel Master Biaya (SPP, Uang Gedung, Seragam)
+model FeeCategory {
+  id          Int       @id @default(autoincrement())
+  name        String    // Contoh: "SPP Bulanan", "Uang Pangkal"
+  amount      Int
+  description String?
+  invoices    Invoice[]
+}
+
+// 4. Tabel Tagihan (Invoice)
+model Invoice {
+  id            String      @id @default(uuid())
+  studentId     Int
+  student       Student     @relation(fields: [studentId], references: [id])
+  feeCategoryId Int
+  feeCategory   FeeCategory @relation(fields: [feeCategoryId], references: [id])
+  
+  month         Int?        // 1-12 (null jika bukan tagihan bulanan)
+  year          Int
+  dueDate       DateTime?   // Tanggal jatuh tempo
+  
+  amount        Int         // Nominal tagihan
+  status        InvoiceStatus @default(UNPAID)
+  
+  payments      Payment[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([studentId, feeCategoryId, month, year]) // Anti tagihan ganda
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PAID
+  PARTIAL
+  EXPIRED
+  CANCELLED
+}
+
+// 5. Tabel Pembayaran (Transaksi ke Payment Gateway)
+model Payment {
+  id                Int           @id @default(autoincrement())
+  invoiceId         String
+  invoice           Invoice       @relation(fields: [invoiceId], references: [id])
+  
+  orderId           String        @unique // ID unik untuk Midtrans (Contoh: INV-2024-001)
+  transactionId     String?       @unique // ID dari Midtrans setelah sukses
+  
+  amount            Int
+  paymentType       String?       // bank_transfer, qris, gopay, dll
+  vaNumber          String?       // Nomor Virtual Account jika ada
+  
+  status            PaymentStatus @default(PENDING)
+  snapToken         String?       @db.Text // Token dari Midtrans Snap
+  paymentUrl        String?       @db.Text
+  
+  rawResponse       Json?         // Menyimpan log respon lengkap dari Midtrans untuk audit
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+enum PaymentStatus {
+  PENDING
+  SETTLEMENT
+  CAPTURE
+  DENY
+  CHALLENGE
+  CANCEL
+  EXPIRE
+  FAILURE
+}
