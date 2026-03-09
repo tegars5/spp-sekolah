@@ -41,7 +41,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -49,8 +52,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
             }
           }
         },
@@ -73,7 +82,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -81,8 +93,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
             }
           }
         }
@@ -96,7 +114,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -104,8 +129,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/fee-categories",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "fee-categories"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "fee-categories"
+              ]
             }
           }
         },
@@ -114,7 +144,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -122,8 +159,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/fee-categories",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "fee-categories"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "fee-categories"
+              ]
             }
           }
         }
@@ -137,7 +179,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -145,8 +194,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/students",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "students"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students"
+              ]
             }
           }
         },
@@ -155,7 +209,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -163,8 +224,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/students",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "students"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students"
+              ]
             }
           }
         },
@@ -173,7 +239,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -181,8 +254,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/students",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "students"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students"
+              ]
             }
           }
         },
@@ -191,12 +269,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/students",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "students"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students"
+              ]
             }
           }
         },
@@ -205,12 +291,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{studentToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/students/1",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "students", "1"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "1"
+              ]
             }
           }
         },
@@ -219,7 +314,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -227,8 +329,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/students",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "students"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students"
+              ]
             }
           }
         },
@@ -237,7 +344,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -245,8 +359,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/students",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "students"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students"
+              ]
             }
           }
         }
@@ -260,7 +379,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -268,8 +394,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/invoices",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "invoices"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "invoices"
+              ]
             }
           }
         },
@@ -278,7 +409,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -286,8 +424,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/invoices",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "invoices"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "invoices"
+              ]
             }
           }
         },
@@ -296,7 +439,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -304,8 +454,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/invoices",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "invoices"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "invoices"
+              ]
             }
           }
         },
@@ -314,7 +469,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -322,8 +484,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/invoices/bulk",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "invoices", "bulk"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "invoices",
+                "bulk"
+              ]
             }
           }
         },
@@ -332,7 +500,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -340,8 +515,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/invoices/bulk",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "invoices", "bulk"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "invoices",
+                "bulk"
+              ]
             }
           }
         },
@@ -350,12 +531,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{studentToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/students/1/invoices",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "students", "1", "invoices"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "1",
+                "invoices"
+              ]
             }
           }
         }
@@ -369,7 +560,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -377,8 +575,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/payments/charge",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "payments", "charge"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "charge"
+              ]
             }
           }
         },
@@ -387,7 +591,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -395,8 +602,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/payments/webhook",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "payments", "webhook"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "webhook"
+              ]
             }
           }
         },
@@ -405,7 +618,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -413,8 +629,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/payments/webhook",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "payments", "webhook"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "webhook"
+              ]
             }
           }
         },
@@ -423,7 +645,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -431,8 +660,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/payments/charge",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "payments", "charge"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "charge"
+              ]
             }
           }
         }
