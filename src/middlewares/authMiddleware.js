@@ -57,7 +57,49 @@ function authorizeRoles(...allowedRoles) {
   };
 }
 
+/**
+ * Middleware untuk memastikan student hanya bisa mengakses data miliknya sendiri.
+ * Admin dan Treasurer diizinkan mengakses semua data.
+ *
+ * @param {string} paramKey - Nama parameter route yang berisi studentId (default: 'id')
+ */
+function authorizeStudentSelfOrAdmin(paramKey = 'id') {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Akses ditolak. Token tidak ditemukan.',
+        error_code: 'UNAUTHORIZED'
+      });
+    }
+
+    if (req.user.role === 'ADMIN' || req.user.role === 'TREASURER') {
+      return next();
+    }
+
+    if (req.user.role !== 'STUDENT') {
+      return res.status(403).json({
+        success: false,
+        message: 'Akses ditolak. Role tidak diizinkan.',
+        error_code: 'FORBIDDEN'
+      });
+    }
+
+    const requestedStudentId = Number(req.params[paramKey]);
+    if (!req.user.studentId || Number(req.user.studentId) !== requestedStudentId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Akses ditolak. Anda hanya bisa mengakses data milik sendiri.',
+        error_code: 'FORBIDDEN_STUDENT_SCOPE'
+      });
+    }
+
+    return next();
+  };
+}
+
 module.exports = {
   authenticate,
-  authorizeRoles
+  authorizeRoles,
+  authorizeStudentSelfOrAdmin
 };

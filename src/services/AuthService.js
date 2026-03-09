@@ -5,6 +5,7 @@
 const prisma = require('../lib/prisma');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const AuditLogService = require('./AuditLogService');
 
 const AuthService = {
   /**
@@ -74,6 +75,61 @@ const AuthService = {
     return {
       user: userWithoutPassword,
       token
+    };
+  },
+
+  /**
+   * Ganti password user yang sedang login.
+   *
+   * @param {number} userId
+   * @param {string} currentPassword
+   * @param {string} newPassword
+   * @returns {Promise<Object>}
+   */
+  async changePassword(userId, currentPassword, newPassword) {
+    const user = await prisma.user.findUnique({
+      where: { id: Number(userId) },
+    });
+
+    if (!user) {
+      const error = new Error('User tidak ditemukan.');
+      error.code = 'USER_NOT_FOUND';
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const isCurrentValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isCurrentValid) {
+      const error = new Error('Password lama tidak sesuai.');
+      error.code = 'INVALID_CURRENT_PASSWORD';
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      const error = new Error('Password baru harus berbeda dari password lama.');
+      error.code = 'PASSWORD_MUST_BE_DIFFERENT';
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: Number(userId) },
+      data: { password: hashedNewPassword },
+    });
+
+    await AuditLogService.logAction({
+      actorUserId: user.id,
+      actorRole: user.role,
+      action: 'AUTH_CHANGE_PASSWORD',
+      entity: 'USER',
+      entityId: user.id,
+    });
+
+    return {
+      message: 'Password berhasil diubah.',
     };
   }
 };

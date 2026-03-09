@@ -4,6 +4,7 @@
 
 const prisma = require('../lib/prisma');
 const bcrypt = require('bcrypt');
+const AuditLogService = require('./AuditLogService');
 
 const StudentService = {
   /**
@@ -12,7 +13,7 @@ const StudentService = {
    * @param {Object} data - { nisn, name, className, phone, address }
    * @returns {Promise<Object>} Data siswa yang baru dibuat.
    */
-  async register(data) {
+  async register(data, requester = null) {
     const { nisn, name, className, phone, address } = data;
     // Input sudah divalidasi oleh Zod middleware (validators.js)
 
@@ -56,6 +57,15 @@ const StudentService = {
       });
 
       return student;
+    });
+
+    await AuditLogService.logAction({
+      actorUserId: requester?.userId,
+      actorRole: requester?.role,
+      action: 'STUDENT_CREATE',
+      entity: 'STUDENT',
+      entityId: result.id,
+      metadata: { nisn: result.nisn, name: result.name },
     });
 
     return result;

@@ -104,6 +104,16 @@ const bulkGenerateSchema = z.object({
 });
 
 /**
+ * Schema untuk POST /api/invoices/expire-overdue
+ */
+const expireOverdueSchema = z.object({
+  referenceDate: z
+    .string()
+    .datetime('Format referenceDate harus ISO datetime.')
+    .optional(),
+});
+
+/**
  * Schema untuk POST /api/payments/charge
  */
 const createPaymentSchema = z.object({
@@ -138,12 +148,26 @@ const loginSchema = z.object({
     .min(1, 'Password tidak boleh kosong.')
 });
 
+/**
+ * Schema untuk PATCH /api/auth/change-password
+ */
+const changePasswordSchema = z.object({
+  currentPassword: z
+    .string({ required_error: 'Password lama wajib diisi.' })
+    .min(1, 'Password lama tidak boleh kosong.'),
+  newPassword: z
+    .string({ required_error: 'Password baru wajib diisi.' })
+    .min(8, 'Password baru minimal 8 karakter.')
+});
+
 module.exports = {
   validate,
   createStudentSchema,
   createInvoiceSchema,
   bulkGenerateSchema,
+  expireOverdueSchema,
   createPaymentSchema,
   createFeeCategorySchema,
   loginSchema,
+  changePasswordSchema,
 };

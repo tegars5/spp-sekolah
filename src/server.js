@@ -13,12 +13,17 @@ const invoiceRoutes = require('./routes/invoiceRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const feeCategoryRoutes = require('./routes/feeCategoryRoutes');
 const authRoutes = require('./routes/authRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const auditLogRoutes = require('./routes/auditLogRoutes');
 
 // Import Middlewares
 const errorHandler = require('./middlewares/errorHandler');
 
 // Import Controllers (untuk nested route)
 const InvoiceController = require('./controllers/InvoiceController');
+const { authenticate, authorizeStudentSelfOrAdmin } = require('./middlewares/authMiddleware');
+const { startBillingScheduler } = require('./jobs/billingScheduler');
 
 const app = express();
 const BASE_PORT = Number(process.env.PORT) || 3000;
@@ -34,9 +39,17 @@ app.use('/api/students', studentRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/fee-categories', feeCategoryRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 
 // Nested route: GET /api/students/:studentId/invoices
-app.get('/api/students/:studentId/invoices', InvoiceController.getByStudent);
+app.get(
+  '/api/students/:studentId/invoices',
+  authenticate,
+  authorizeStudentSelfOrAdmin('studentId'),
+  InvoiceController.getByStudent
+);
 
 // --- Centralized Error Handler (harus di paling akhir) ---
 app.use(errorHandler);
@@ -57,3 +70,4 @@ function startServer(port, retriesLeft) {
 }
 
 startServer(BASE_PORT, MAX_PORT_RETRIES);
+startBillingScheduler();

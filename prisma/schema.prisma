@@ -11,12 +11,13 @@ datasource db {
 
 // 1. Tabel User (Untuk Login Admin & Siswa)
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
   password  String
-  role      Role     @default(STUDENT) // ADMIN, STUDENT, TREASURER
-  student   Student? // Relasi ke data siswa jika role-nya STUDENT
-  createdAt DateTime @default(now())
+  role      Role       @default(STUDENT) // ADMIN, STUDENT, TREASURER
+  student   Student?   // Relasi ke data siswa jika role-nya STUDENT
+  auditLogs AuditLog[]
+  createdAt DateTime   @default(now())
 }
 
 enum Role {
@@ -112,4 +113,22 @@ enum PaymentStatus {
   CANCEL
   EXPIRE
   FAILURE
+}
+
+// 6. Tabel Audit Log (Jejak aksi penting sistem)
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  actorUserId Int?
+  actor       User?    @relation(fields: [actorUserId], references: [id])
+  actorRole   Role?
+  action      String
+  entity      String
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([entity])
+  @@index([actorUserId])
 }

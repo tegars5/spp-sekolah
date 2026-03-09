@@ -4,6 +4,7 @@
 // Sesuai architect.md & skill.md.
 
 const prisma = require('../lib/prisma');
+const AuditLogService = require('./AuditLogService');
 
 /**
  * Hitung due date — tanggal 10 bulan berikutnya.
@@ -42,7 +43,7 @@ const InvoiceService = {
    * @param {number} year - Tahun tagihan.
    * @returns {Promise<Object>} Invoice yang baru dibuat.
    */
-  async generate(studentId, feeCategoryId, month, year) {
+  async generate(studentId, feeCategoryId, month, year, requester = null) {
     // 1. Pastikan siswa ada
     const student = await prisma.student.findUnique({
       where: { id: Number(studentId) },
@@ -99,13 +100,28 @@ const InvoiceService = {
         feeCategoryId: Number(feeCategoryId),
         month: parsedMonth,
         year: Number(year),
-        amount: feeCategory.amount, // Nominal dari database, bukan hardcode
+        amount: feeCategory.amount, 
         dueDate,
         status: 'UNPAID',
       },
       include: {
         student: true,
         feeCategory: true,
+      },
+    });
+
+    await AuditLogService.logAction({
+      actorUserId: requester?.userId,
+      actorRole: requester?.role,
+      action: 'INVOICE_CREATE',
+      entity: 'INVOICE',
+      entityId: invoice.id,
+      metadata: {
+        studentId: invoice.studentId,
+        feeCategoryId: invoice.feeCategoryId,
+        month: invoice.month,
+        year: invoice.year,
+        amount: invoice.amount,
       },
     });
 
@@ -124,7 +140,7 @@ const InvoiceService = {
    * @param {number} year - Tahun tagihan.
    * @returns {Promise<Object>} { created: [...], skipped: [...], totalCreated, totalSkipped }
    */
-  async generateBulk(feeCategoryId, month, year) {
+  async generateBulk(feeCategoryId, month, year, requester = null) {
     // 1. Ambil nominal dari FeeCategory
     const feeCategory = await prisma.feeCategory.findUnique({
       where: { id: Number(feeCategoryId) },
@@ -197,7 +213,7 @@ const InvoiceService = {
       });
     }
 
-    return {
+    const result = {
       feeCategoryName: feeCategory.name,
       period: `${parsedMonth || '-'}/${year}`,
       totalCreated: created.length,
@@ -205,14 +221,42 @@ const InvoiceService = {
       created,
       skipped,
     };
+
+    await AuditLogService.logAction({
+      actorUserId: requester?.userId,
+      actorRole: requester?.role,
+      action: 'INVOICE_BULK_GENERATE',
+      entity: 'INVOICE',
+      metadata: {
+        feeCategoryId: Number(feeCategoryId),
+        month: parsedMonth,
+        year: Number(year),
+        totalCreated: result.totalCreated,
+        totalSkipped: result.totalSkipped,
+      },
+    });
+
+    return result;
   },
 
   /**
    * Mengambil semua tagihan milik siswa tertentu.
    * @param {number} studentId - ID siswa.
+   * @param {Object} requester - Data user dari JWT (opsional, defense-in-depth).
    * @returns {Promise<Array>} Daftar tagihan siswa.
    */
-  async getByStudent(studentId) {
+  async getByStudent(studentId, requester = null) {
+    if (
+      requester &&
+      requester.role === 'STUDENT' &&
+      Number(requester.studentId) !== Number(studentId)
+    ) {
+      const error = new Error('Akses ditolak. Anda hanya bisa melihat tagihan milik sendiri.');
+      error.code = 'FORBIDDEN_STUDENT_SCOPE';
+      error.statusCode = 403;
+      throw error;
+    }
+
     const invoices = await prisma.invoice.findMany({
       where: { studentId: Number(studentId) },
       include: {
@@ -223,6 +267,98 @@ const InvoiceService = {
     });
 
     return invoices;
+  },
+
+  /**
+   * Mengambil detail satu invoice berdasarkan ID.
+   * Student hanya boleh mengakses invoice miliknya sendiri.
+   *
+   * @param {string} invoiceId - UUID invoice.
+   * @param {Object} requester - Data user dari JWT.
+   * @returns {Promise<Object>} Detail invoice.
+   */
+  async getById(invoiceId, requester = null) {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        student: true,
+        feeCategory: true,
+        payments: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!invoice) {
+      const error = new Error(`Invoice dengan ID ${invoiceId} tidak ditemukan.`);
+      error.code = 'INVOICE_NOT_FOUND';
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (
+      requester &&
+      requester.role === 'STUDENT' &&
+      Number(requester.studentId) !== Number(invoice.studentId)
+    ) {
+      const error = new Error('Akses ditolak. Anda hanya bisa melihat invoice milik sendiri.');
+      error.code = 'FORBIDDEN_STUDENT_SCOPE';
+      error.statusCode = 403;
+      throw error;
+    }
+
+    return invoice;
+  },
+
+  /**
+   * Menandai invoice yang lewat jatuh tempo menjadi EXPIRED.
+   * Hanya memproses invoice status UNPAID dan PARTIAL.
+   *
+   * @param {Date} referenceDate - Patokan waktu pengecekan overdue.
+   * @returns {Promise<Object>} Ringkasan proses expire.
+   */
+  async expireOverdueInvoices(referenceDate = new Date(), requester = null) {
+    const overdueWhere = {
+      dueDate: { lt: referenceDate },
+      status: { in: ['UNPAID', 'PARTIAL'] },
+    };
+
+    const overdueInvoiceIds = await prisma.invoice.findMany({
+      where: overdueWhere,
+      select: { id: true },
+    });
+
+    if (overdueInvoiceIds.length === 0) {
+      return {
+        referenceDate: referenceDate.toISOString(),
+        totalExpired: 0,
+        message: 'Tidak ada invoice overdue yang perlu di-expire.',
+      };
+    }
+
+    await prisma.invoice.updateMany({
+      where: overdueWhere,
+      data: { status: 'EXPIRED' },
+    });
+
+    const result = {
+      referenceDate: referenceDate.toISOString(),
+      totalExpired: overdueInvoiceIds.length,
+      expiredInvoiceIds: overdueInvoiceIds.map((item) => item.id),
+    };
+
+    await AuditLogService.logAction({
+      actorUserId: requester?.userId,
+      actorRole: requester?.role,
+      action: 'INVOICE_EXPIRE_OVERDUE',
+      entity: 'INVOICE',
+      metadata: {
+        referenceDate: result.referenceDate,
+        totalExpired: result.totalExpired,
+      },
+    });
+
+    return result;
   },
 
   // CATATAN: Logika finalisasi pembayaran telah dipindahkan ke

@@ -23,7 +23,7 @@ router.post(
 // GET /api/fee-categories — Ambil semua kategori biaya (Admin & Student)
 router.get(
   '/', 
-  authorizeRoles('ADMIN', 'STUDENT'), 
+  authorizeRoles('ADMIN', 'TREASURER', 'STUDENT'), 
   FeeCategoryController.getAll
 );
 

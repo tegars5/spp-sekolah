@@ -6,7 +6,7 @@ const FeeCategoryService = require('../services/FeeCategoryService');
 const FeeCategoryController = {
   async create(req, res, next) {
     try {
-      const result = await FeeCategoryService.create(req.body);
+      const result = await FeeCategoryService.create(req.body, req.user);
       return res.status(201).json({ success: true, data: result });
     } catch (error) {
       next(error);

@@ -10,7 +10,7 @@ const StudentController = {
    */
   async create(req, res, next) {
     try {
-      const result = await StudentService.register(req.body);
+      const result = await StudentService.register(req.body, req.user);
       return res.status(201).json({ success: true, data: result });
     } catch (error) {
       next(error);

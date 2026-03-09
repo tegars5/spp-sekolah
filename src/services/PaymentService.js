@@ -6,6 +6,41 @@
 const prisma = require('../lib/prisma');
 const snap = require('../lib/midtrans');
 const crypto = require('crypto');
+const midtransClient = require('midtrans-client');
+const AuditLogService = require('./AuditLogService');
+
+const coreApi = new midtransClient.CoreApi({
+  isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
+  serverKey: process.env.MIDTRANS_SERVER_KEY,
+  clientKey: process.env.MIDTRANS_CLIENT_KEY,
+});
+
+function mapMidtransStatusToInternal(transactionStatus, fraudStatus) {
+  let paymentStatus;
+  let invoiceStatus;
+
+  if (transactionStatus === 'capture') {
+    paymentStatus = fraudStatus === 'accept' ? 'CAPTURE' : 'CHALLENGE';
+    invoiceStatus = fraudStatus === 'accept' ? 'PAID' : 'UNPAID';
+  } else if (transactionStatus === 'settlement') {
+    paymentStatus = 'SETTLEMENT';
+    invoiceStatus = 'PAID';
+  } else if (transactionStatus === 'expire') {
+    paymentStatus = 'EXPIRE';
+    invoiceStatus = 'EXPIRED';
+  } else if (transactionStatus === 'cancel' || transactionStatus === 'deny') {
+    paymentStatus = transactionStatus === 'cancel' ? 'CANCEL' : 'DENY';
+    invoiceStatus = 'UNPAID';
+  } else if (transactionStatus === 'pending') {
+    paymentStatus = 'PENDING';
+    invoiceStatus = 'UNPAID';
+  } else {
+    paymentStatus = 'FAILURE';
+    invoiceStatus = 'UNPAID';
+  }
+
+  return { paymentStatus, invoiceStatus };
+}
 
 const PaymentService = {
   /**
@@ -19,9 +54,10 @@ const PaymentService = {
    * 5. Simpan data Payment di database
    * 
    * @param {string} invoiceId - UUID invoice yang akan dibayar.
+   * @param {Object} requester - Data user dari JWT.
    * @returns {Promise<Object>} { snapToken, paymentUrl, orderId }
    */
-  async createTransaction(invoiceId) {
+  async createTransaction(invoiceId, requester) {
     // 1. Ambil invoice beserta data siswa dan kategori biaya
     const invoice = await prisma.invoice.findUnique({
       where: { id: invoiceId },
@@ -35,6 +71,18 @@ const PaymentService = {
       const error = new Error(`Invoice dengan ID ${invoiceId} tidak ditemukan.`);
       error.code = 'INVOICE_NOT_FOUND';
       error.statusCode = 404;
+      throw error;
+    }
+
+    // Student hanya boleh membuat pembayaran untuk invoice miliknya sendiri.
+    if (
+      requester &&
+      requester.role === 'STUDENT' &&
+      Number(requester.studentId) !== Number(invoice.studentId)
+    ) {
+      const error = new Error('Akses ditolak. Anda hanya bisa membayar invoice milik sendiri.');
+      error.code = 'FORBIDDEN_STUDENT_SCOPE';
+      error.statusCode = 403;
       throw error;
     }
 
@@ -120,6 +168,250 @@ const PaymentService = {
   },
 
   /**
+   * Mengambil detail pembayaran berdasarkan orderId.
+   * Student hanya boleh melihat pembayaran invoice miliknya sendiri.
+   *
+   * @param {string} orderId - Order ID payment.
+   * @param {Object} requester - Data user dari JWT.
+   * @returns {Promise<Object>} Detail payment.
+   */
+  async getByOrderId(orderId, requester) {
+    const payment = await prisma.payment.findUnique({
+      where: { orderId },
+      include: {
+        invoice: {
+          include: {
+            student: true,
+            feeCategory: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      const error = new Error(`Payment dengan orderId ${orderId} tidak ditemukan.`);
+      error.code = 'PAYMENT_NOT_FOUND';
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (
+      requester &&
+      requester.role === 'STUDENT' &&
+      Number(requester.studentId) !== Number(payment.invoice.studentId)
+    ) {
+      const error = new Error('Akses ditolak. Anda hanya bisa melihat pembayaran milik sendiri.');
+      error.code = 'FORBIDDEN_STUDENT_SCOPE';
+      error.statusCode = 403;
+      throw error;
+    }
+
+    return payment;
+  },
+
+  /**
+   * List pembayaran dengan filter opsional invoiceId.
+   * Student otomatis dibatasi ke invoice miliknya sendiri.
+   *
+   * @param {Object} requester - Data user dari JWT.
+   * @param {string|undefined} invoiceId - UUID invoice (opsional).
+   * @returns {Promise<Array>} Daftar payment.
+   */
+  async listPayments(requester, invoiceId) {
+    const where = {};
+
+    if (invoiceId) {
+      where.invoiceId = invoiceId;
+    }
+
+    if (requester && requester.role === 'STUDENT') {
+      where.invoice = { studentId: Number(requester.studentId) };
+    }
+
+    const payments = await prisma.payment.findMany({
+      where,
+      include: {
+        invoice: {
+          include: {
+            student: true,
+            feeCategory: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return payments;
+  },
+
+  /**
+   * Reconciliation status payment dari Midtrans.
+   * Admin bisa cek mismatch status Midtrans vs DB, lalu sinkronkan bila diperlukan.
+   *
+   * @param {string} orderId
+   * @param {Object} requester
+   * @param {boolean} applyChanges
+   * @returns {Promise<Object>}
+   */
+  async reconcilePayment(orderId, requester, applyChanges = false) {
+    if (!requester || !['ADMIN', 'TREASURER'].includes(requester.role)) {
+      const error = new Error('Akses ditolak. Hanya ADMIN/TREASURER yang dapat menjalankan rekonsiliasi.');
+      error.code = 'FORBIDDEN';
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { orderId },
+      include: { invoice: true },
+    });
+
+    if (!payment) {
+      const error = new Error(`Payment dengan orderId ${orderId} tidak ditemukan.`);
+      error.code = 'PAYMENT_NOT_FOUND';
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const midtransStatus = await coreApi.transaction.status(orderId);
+    const { paymentStatus, invoiceStatus } = mapMidtransStatusToInternal(
+      midtransStatus.transaction_status,
+      midtransStatus.fraud_status
+    );
+
+    const mismatch = {
+      paymentStatus: payment.status !== paymentStatus,
+      invoiceStatus: payment.invoice.status !== invoiceStatus,
+    };
+
+    let applied = false;
+    if (applyChanges && (mismatch.paymentStatus || mismatch.invoiceStatus)) {
+      await prisma.$transaction(async (tx) => {
+        await tx.payment.update({
+          where: { orderId },
+          data: {
+            status: paymentStatus,
+            paymentType: midtransStatus.payment_type || payment.paymentType || null,
+            vaNumber: midtransStatus.va_numbers?.[0]?.va_number || payment.vaNumber || null,
+            transactionId: midtransStatus.transaction_id || payment.transactionId || null,
+            rawResponse: midtransStatus,
+          },
+        });
+
+        await tx.invoice.update({
+          where: { id: payment.invoiceId },
+          data: { status: invoiceStatus },
+        });
+      });
+      applied = true;
+    }
+
+    await AuditLogService.logAction({
+      actorUserId: requester.userId,
+      actorRole: requester.role,
+      action: 'PAYMENT_RECONCILE',
+      entity: 'PAYMENT',
+      entityId: orderId,
+      metadata: {
+        applyRequested: applyChanges,
+        applied,
+        mismatch,
+      },
+    });
+
+    return {
+      orderId,
+      applyRequested: applyChanges,
+      applied,
+      mismatch,
+      local: {
+        paymentStatus: payment.status,
+        invoiceStatus: payment.invoice.status,
+      },
+      midtrans: {
+        transactionStatus: midtransStatus.transaction_status,
+        fraudStatus: midtransStatus.fraud_status || null,
+        paymentStatus,
+        invoiceStatus,
+        transactionId: midtransStatus.transaction_id || null,
+      },
+    };
+  },
+
+  /**
+   * Rekonsiliasi batch untuk payment berstatus PENDING.
+   * Cocok untuk maintenance harian ketika webhook terlewat.
+   *
+   * @param {Object} requester
+   * @param {Object} options
+   * @param {number} options.limit
+   * @param {boolean} options.applyChanges
+   * @returns {Promise<Object>}
+   */
+  async reconcilePendingPayments(requester, { limit = 20, applyChanges = false } = {}) {
+    if (!requester || !['ADMIN', 'TREASURER'].includes(requester.role)) {
+      const error = new Error('Akses ditolak. Hanya ADMIN/TREASURER yang dapat menjalankan rekonsiliasi.');
+      error.code = 'FORBIDDEN';
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const parsedLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const pendings = await prisma.payment.findMany({
+      where: { status: 'PENDING' },
+      orderBy: { createdAt: 'asc' },
+      take: parsedLimit,
+      select: { orderId: true },
+    });
+
+    const results = [];
+    for (const item of pendings) {
+      try {
+        const result = await this.reconcilePayment(item.orderId, requester, applyChanges);
+        results.push({
+          orderId: item.orderId,
+          ok: true,
+          mismatch: result.mismatch,
+          applied: result.applied,
+        });
+      } catch (error) {
+        results.push({
+          orderId: item.orderId,
+          ok: false,
+          error_code: error.code || 'RECONCILE_FAILED',
+          message: error.message,
+        });
+      }
+    }
+
+    const successCount = results.filter((item) => item.ok).length;
+    const failedCount = results.length - successCount;
+    const appliedCount = results.filter((item) => item.ok && item.applied).length;
+
+    await AuditLogService.logAction({
+      actorUserId: requester.userId,
+      actorRole: requester.role,
+      action: 'PAYMENT_RECONCILE_PENDING_BATCH',
+      entity: 'PAYMENT',
+      metadata: {
+        scanned: results.length,
+        successCount,
+        failedCount,
+        appliedCount,
+        applyChanges,
+      },
+    });
+
+    return {
+      scanned: results.length,
+      successCount,
+      failedCount,
+      appliedCount,
+      results,
+    };
+  },
+
+  /**
    * Handle webhook notification dari Midtrans.
    * 
    * IDEMPOTENT WEBHOOK — sesuai architect.md:
@@ -182,31 +474,7 @@ const PaymentService = {
 
     // 4. MAP STATUS MIDTRANS → STATUS INTERNAL
     //    Sesuai architect.md checklist: "status transaksi dipetakan dengan benar"
-    let paymentStatus;
-    let invoiceStatus;
-
-    if (transactionStatus === 'capture') {
-      // Untuk kartu kredit: cek fraud_status
-      paymentStatus = fraudStatus === 'accept' ? 'CAPTURE' : 'CHALLENGE';
-      invoiceStatus = fraudStatus === 'accept' ? 'PAID' : 'UNPAID';
-    } else if (transactionStatus === 'settlement') {
-      // Settlement = pembayaran berhasil (PAID)
-      paymentStatus = 'SETTLEMENT';
-      invoiceStatus = 'PAID';
-    } else if (transactionStatus === 'expire') {
-      // Sesuai architect.md: "menangani kondisi EXPIRED jika siswa tidak membayar tepat waktu"
-      paymentStatus = 'EXPIRE';
-      invoiceStatus = 'EXPIRED';
-    } else if (transactionStatus === 'cancel' || transactionStatus === 'deny') {
-      paymentStatus = transactionStatus === 'cancel' ? 'CANCEL' : 'DENY';
-      invoiceStatus = 'UNPAID'; // Invoice kembali ke UNPAID agar bisa dicoba lagi
-    } else if (transactionStatus === 'pending') {
-      paymentStatus = 'PENDING';
-      invoiceStatus = 'UNPAID';
-    } else {
-      paymentStatus = 'FAILURE';
-      invoiceStatus = 'UNPAID';
-    }
+    const { paymentStatus, invoiceStatus } = mapMidtransStatusToInternal(transactionStatus, fraudStatus);
 
     // 5. PRISMA $TRANSACTION — Atomic update Payment + Invoice
     //    Sesuai architect.md: "Gunakan Prisma Transactions ($transaction)"

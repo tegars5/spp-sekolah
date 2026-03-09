@@ -5,7 +5,11 @@
 const { Router } = require('express');
 const StudentController = require('../controllers/StudentController');
 const { validate, createStudentSchema } = require('../middlewares/validators');
-const { authenticate, authorizeRoles } = require('../middlewares/authMiddleware');
+const {
+  authenticate,
+  authorizeRoles,
+  authorizeStudentSelfOrAdmin,
+} = require('../middlewares/authMiddleware');
 
 const router = Router();
 
@@ -25,6 +29,6 @@ router.get('/', authorizeRoles('ADMIN'), StudentController.getAll);
 
 // GET /api/students/:id — Ambil detail siswa
 // Admin bisa lihat semua, Student cuma bisa lihat info sendiri
-router.get('/:id', authorizeRoles('ADMIN', 'STUDENT'), StudentController.getById);
+router.get('/:id', authorizeStudentSelfOrAdmin('id'), StudentController.getById);
 
 module.exports = router;

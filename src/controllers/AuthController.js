@@ -16,6 +16,20 @@ const AuthController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  /**
+   * PATCH /api/auth/change-password
+   * Endpoint untuk mengganti password user yang sedang login.
+   */
+  async changePassword(req, res, next) {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const result = await AuthService.changePassword(req.user.userId, currentPassword, newPassword);
+      return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
   }
 };
 

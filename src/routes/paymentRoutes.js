@@ -14,9 +14,40 @@ const router = Router();
 router.post(
   '/charge', 
   authenticate,
-  authorizeRoles('ADMIN', 'STUDENT'),
+  authorizeRoles('ADMIN', 'TREASURER', 'STUDENT'),
   validate(createPaymentSchema), 
   PaymentController.createTransaction
+);
+
+// GET /api/payments?invoiceId=... — List payment (Admin & Student)
+router.get(
+  '/',
+  authenticate,
+  authorizeRoles('ADMIN', 'TREASURER', 'STUDENT'),
+  PaymentController.list
+);
+
+// GET /api/payments/:orderId — Detail payment by orderId (Admin & Student)
+router.get(
+  '/:orderId',
+  authenticate,
+  authorizeRoles('ADMIN', 'TREASURER', 'STUDENT'),
+  PaymentController.getByOrderId
+);
+
+// POST /api/payments/:orderId/reconcile?apply=true — Reconciliation Midtrans vs DB (Admin)
+router.post(
+  '/reconcile-pending',
+  authenticate,
+  authorizeRoles('ADMIN', 'TREASURER'),
+  PaymentController.reconcilePending
+);
+
+router.post(
+  '/:orderId/reconcile',
+  authenticate,
+  authorizeRoles('ADMIN', 'TREASURER'),
+  PaymentController.reconcile
 );
 
 // POST /api/payments/webhook — Midtrans webhook callback
