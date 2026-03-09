@@ -5,6 +5,27 @@
 
 const prisma = require('../lib/prisma');
 
+/**
+ * Hitung due date — tanggal 10 bulan berikutnya.
+ * Contoh: invoice bulan Januari 2026 → dueDate = 10 Februari 2026.
+ * Jika tanpa bulan (non-bulanan), dueDate = 31 Desember tahun tagihan.
+ * 
+ * @param {number|null} month - Bulan tagihan (1-12).
+ * @param {number} year - Tahun tagihan.
+ * @returns {Date} Tanggal jatuh tempo.
+ */
+function calculateDueDate(month, year) {
+  if (month) {
+    // Tanggal 10 bulan berikutnya
+    // Jika bulan = 12 (Desember) → 10 Januari tahun berikutnya
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    return new Date(nextYear, nextMonth - 1, 10); // Date month is 0-indexed
+  }
+  // Tagihan non-bulanan: akhir tahun
+  return new Date(year, 11, 31);
+}
+
 const InvoiceService = {
   /**
    * Generate tagihan baru untuk seorang siswa.
@@ -13,6 +34,8 @@ const InvoiceService = {
    * Mengecek composite unique constraint [studentId, feeCategoryId, month, year]
    * sebelum membuat tagihan. Jika sudah ada, lempar error.
    * 
+   * Input sudah divalidasi oleh Zod middleware di layer sebelumnya.
+   * 
    * @param {number} studentId - ID siswa.
    * @param {number} feeCategoryId - ID kategori biaya (SPP, Uang Gedung, dll).
    * @param {number|null} month - Bulan tagihan (1-12), null jika bukan bulanan.
@@ -20,18 +43,7 @@ const InvoiceService = {
    * @returns {Promise<Object>} Invoice yang baru dibuat.
    */
   async generate(studentId, feeCategoryId, month, year) {
-    // 1. Validasi input — amount harus integer positif (dari FeeCategory)
-    if (!studentId || !feeCategoryId || !year) {
-      throw new Error('studentId, feeCategoryId, dan year wajib diisi.');
-    }
-
-    if (month !== null && month !== undefined) {
-      if (!Number.isInteger(month) || month < 1 || month > 12) {
-        throw new Error('Bulan harus berupa angka 1-12.');
-      }
-    }
-
-    // 2. Pastikan siswa ada
+    // 1. Pastikan siswa ada
     const student = await prisma.student.findUnique({
       where: { id: Number(studentId) },
     });
@@ -42,7 +54,7 @@ const InvoiceService = {
       throw error;
     }
 
-    // 3. Ambil nominal dari FeeCategory (JANGAN hardcode — sesuai architect.md Red Flags)
+    // 2. Ambil nominal dari FeeCategory (JANGAN hardcode — sesuai architect.md Red Flags)
     const feeCategory = await prisma.feeCategory.findUnique({
       where: { id: Number(feeCategoryId) },
     });
@@ -53,14 +65,16 @@ const InvoiceService = {
       throw error;
     }
 
-    // 4. ANTI-DOUBLE BILLING — Cek apakah tagihan sudah ada untuk periode ini
+    // 3. ANTI-DOUBLE BILLING — Cek apakah tagihan sudah ada untuk periode ini
     //    Menggunakan composite unique key: [studentId, feeCategoryId, month, year]
+    const parsedMonth = month !== null && month !== undefined ? Number(month) : null;
+
     const existing = await prisma.invoice.findUnique({
       where: {
         studentId_feeCategoryId_month_year: {
           studentId: Number(studentId),
           feeCategoryId: Number(feeCategoryId),
-          month: month !== null && month !== undefined ? Number(month) : null,
+          month: parsedMonth,
           year: Number(year),
         },
       },
@@ -75,21 +89,15 @@ const InvoiceService = {
       throw error;
     }
 
-    // 5. Hitung due date — akhir bulan tagihan (atau akhir tahun jika tanpa bulan)
-    let dueDate = null;
-    if (month) {
-      // Akhir bulan: bulan berikutnya tanggal 0 = hari terakhir bulan ini
-      dueDate = new Date(year, month, 0); // month is 1-indexed, Date month is 0-indexed
-    } else {
-      dueDate = new Date(year, 11, 31); // 31 Desember tahun tagihan
-    }
+    // 4. Hitung due date — tanggal 10 bulan berikutnya
+    const dueDate = calculateDueDate(parsedMonth, Number(year));
 
-    // 6. Buat invoice — amount diambil dari FeeCategory (integer, bukan float!)
+    // 5. Buat invoice — amount diambil dari FeeCategory (integer, bukan float!)
     const invoice = await prisma.invoice.create({
       data: {
         studentId: Number(studentId),
         feeCategoryId: Number(feeCategoryId),
-        month: month !== null && month !== undefined ? Number(month) : null,
+        month: parsedMonth,
         year: Number(year),
         amount: feeCategory.amount, // Nominal dari database, bukan hardcode
         dueDate,
@@ -102,6 +110,101 @@ const InvoiceService = {
     });
 
     return invoice;
+  },
+
+  /**
+   * BULK GENERATE — Generate tagihan untuk SEMUA siswa aktif sekaligus.
+   * 
+   * Untuk admin sekolah: satu klik buat tagihan ratusan siswa.
+   * Anti-Double Billing tetap aktif: siswa yang sudah punya tagihan
+   * di periode tersebut akan di-skip (tidak error).
+   * 
+   * @param {number} feeCategoryId - ID kategori biaya.
+   * @param {number|null} month - Bulan tagihan (1-12), null jika bukan bulanan.
+   * @param {number} year - Tahun tagihan.
+   * @returns {Promise<Object>} { created: [...], skipped: [...], totalCreated, totalSkipped }
+   */
+  async generateBulk(feeCategoryId, month, year) {
+    // 1. Ambil nominal dari FeeCategory
+    const feeCategory = await prisma.feeCategory.findUnique({
+      where: { id: Number(feeCategoryId) },
+    });
+    if (!feeCategory) {
+      const error = new Error(`Kategori biaya dengan ID ${feeCategoryId} tidak ditemukan.`);
+      error.code = 'FEE_CATEGORY_NOT_FOUND';
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // 2. Ambil semua siswa aktif
+    const activeStudents = await prisma.student.findMany({
+      where: { isActive: true },
+    });
+
+    if (activeStudents.length === 0) {
+      const error = new Error('Tidak ada siswa aktif yang ditemukan.');
+      error.code = 'NO_ACTIVE_STUDENTS';
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const parsedMonth = month !== null && month !== undefined ? Number(month) : null;
+    const dueDate = calculateDueDate(parsedMonth, Number(year));
+
+    const created = [];
+    const skipped = [];
+
+    // 3. Loop tiap siswa — cek Anti-Double Billing per siswa, skip jika sudah ada
+    for (const student of activeStudents) {
+      const existing = await prisma.invoice.findUnique({
+        where: {
+          studentId_feeCategoryId_month_year: {
+            studentId: student.id,
+            feeCategoryId: Number(feeCategoryId),
+            month: parsedMonth,
+            year: Number(year),
+          },
+        },
+      });
+
+      if (existing) {
+        skipped.push({
+          studentId: student.id,
+          studentName: student.name,
+          reason: 'Tagihan sudah ada untuk periode ini.',
+        });
+        continue;
+      }
+
+      // Buat invoice baru
+      const invoice = await prisma.invoice.create({
+        data: {
+          studentId: student.id,
+          feeCategoryId: Number(feeCategoryId),
+          month: parsedMonth,
+          year: Number(year),
+          amount: feeCategory.amount,
+          dueDate,
+          status: 'UNPAID',
+        },
+      });
+
+      created.push({
+        invoiceId: invoice.id,
+        studentId: student.id,
+        studentName: student.name,
+        amount: invoice.amount,
+      });
+    }
+
+    return {
+      feeCategoryName: feeCategory.name,
+      period: `${parsedMonth || '-'}/${year}`,
+      totalCreated: created.length,
+      totalSkipped: skipped.length,
+      created,
+      skipped,
+    };
   },
 
   /**
@@ -122,77 +225,9 @@ const InvoiceService = {
     return invoices;
   },
 
-  /**
-   * Finalisasi pembayaran — update status Invoice & buat record Payment secara ATOMIK.
-   * 
-   * PRISMA $TRANSACTION:
-   * Menggunakan interactive transaction untuk menjamin Financial Integrity.
-   * Jika salah satu operasi gagal, seluruh perubahan di-rollback.
-   * 
-   * Sesuai architect.md: "Gunakan Prisma Transactions ($transaction) untuk setiap 
-   * operasi yang melibatkan perubahan status tagihan dan pencatatan pembayaran."
-   * 
-   * @param {string} invoiceId - ID invoice yang dibayar.
-   * @param {Object} paymentData - { orderId, amount, paymentType, vaNumber, rawResponse }
-   * @returns {Promise<Object>} Hasil transaksi { invoice, payment }.
-   */
-  async finalizePayment(invoiceId, paymentData) {
-    const { orderId, amount, paymentType, vaNumber, rawResponse } = paymentData;
-
-    // Validasi: amount harus integer positif (architect.md — Strict Validation)
-    if (!Number.isInteger(amount) || amount <= 0) {
-      const error = new Error('Nominal pembayaran harus berupa angka positif.');
-      error.code = 'INVALID_AMOUNT';
-      error.statusCode = 400;
-      throw error;
-    }
-
-    // IDEMPOTENCY CHECK — sesuai architect.md & skill.md (Webhook Security)
-    const currentInvoice = await prisma.invoice.findUnique({
-      where: { id: invoiceId },
-    });
-
-    if (!currentInvoice) {
-      const error = new Error(`Invoice dengan ID ${invoiceId} tidak ditemukan.`);
-      error.code = 'INVOICE_NOT_FOUND';
-      error.statusCode = 404;
-      throw error;
-    }
-
-    // Jika sudah PAID, jangan proses ulang (Idempotent Webhook — architect.md)
-    if (currentInvoice.status === 'PAID') {
-      const error = new Error('Invoice ini sudah dibayar.');
-      error.code = 'INVOICE_ALREADY_PAID';
-      error.statusCode = 409;
-      throw error;
-    }
-
-    // PRISMA $TRANSACTION — Atomic update Invoice + create Payment
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Update status invoice menjadi PAID
-      const updatedInvoice = await tx.invoice.update({
-        where: { id: invoiceId },
-        data: { status: 'PAID' },
-      });
-
-      // 2. Buat record Payment (simpan rawResponse untuk audit trail)
-      const payment = await tx.payment.create({
-        data: {
-          invoiceId,
-          orderId,
-          amount,
-          paymentType: paymentType || null,
-          vaNumber: vaNumber || null,
-          status: 'SETTLEMENT',
-          rawResponse: rawResponse || null, // Audit trail — architect.md
-        },
-      });
-
-      return { invoice: updatedInvoice, payment };
-    });
-
-    return result;
-  },
+  // CATATAN: Logika finalisasi pembayaran telah dipindahkan ke
+  // PaymentService.handleWebhookNotification() yang lebih lengkap
+  // (termasuk signature verification, status mapping, dan audit trail).
 };
 
 module.exports = InvoiceService;

@@ -1,29 +1,49 @@
 // src/lib/prisma.js
-// Singleton instance PrismaClient untuk seluruh aplikasi.
-// Prisma 7 menggunakan Driver Adapter — tidak lagi koneksi langsung.
-// Untuk MySQL/MariaDB, gunakan @prisma/adapter-mariadb.
+// Singleton PrismaClient.
+// Prisma 7 client engine membutuhkan driver adapter (MariaDB/MySQL).
 
 const { PrismaClient } = require('@prisma/client');
 const { PrismaMariaDb } = require('@prisma/adapter-mariadb');
-const mariadb = require('mariadb');
 
-// Parse DATABASE_URL menjadi komponen terpisah
-// Karena package mariadb membutuhkan format mariadb://, bukan mysql://
-const dbUrl = new URL(process.env.DATABASE_URL);
+const databaseUrl = process.env.DATABASE_URL;
 
-const pool = mariadb.createPool({
-  host: dbUrl.hostname,
-  port: Number(dbUrl.port) || 3306,
-  user: dbUrl.username,
-  password: dbUrl.password || undefined,
-  database: dbUrl.pathname.replace('/', ''), // hilangkan leading /
-  connectionLimit: 5,
-});
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL belum diset. Isi DATABASE_URL di file .env.');
+}
 
-// Buat adapter dari pool
-const adapter = new PrismaMariaDb(pool);
+function buildAdapterConfig(urlString) {
+  let parsed;
 
-// Inisialisasi PrismaClient dengan adapter (Prisma 7 style)
+  try {
+    parsed = new URL(urlString);
+  } catch {
+    throw new Error('DATABASE_URL tidak valid. Format yang benar: mysql://user:pass@host:3306/dbname');
+  }
+
+  if (!['mysql:', 'mariadb:'].includes(parsed.protocol)) {
+    throw new Error('Protocol DATABASE_URL harus mysql:// atau mariadb://');
+  }
+
+  const database = parsed.pathname.replace(/^\//, '');
+  if (!database) {
+    throw new Error('Nama database pada DATABASE_URL tidak boleh kosong.');
+  }
+
+  const config = {
+    host: parsed.hostname,
+    port: parsed.port ? Number(parsed.port) : 3306,
+    user: decodeURIComponent(parsed.username),
+    database,
+  };
+
+  if (parsed.password) {
+    config.password = decodeURIComponent(parsed.password);
+  }
+
+  return config;
+}
+
+const adapter = new PrismaMariaDb(buildAdapterConfig(databaseUrl));
 const prisma = new PrismaClient({ adapter });
 
 module.exports = prisma;

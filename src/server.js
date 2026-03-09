@@ -10,6 +10,9 @@ require('dotenv').config();
 // Import Routes
 const studentRoutes = require('./routes/studentRoutes');
 const invoiceRoutes = require('./routes/invoiceRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
+const feeCategoryRoutes = require('./routes/feeCategoryRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 // Import Middlewares
 const errorHandler = require('./middlewares/errorHandler');
@@ -18,15 +21,19 @@ const errorHandler = require('./middlewares/errorHandler');
 const InvoiceController = require('./controllers/InvoiceController');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const BASE_PORT = Number(process.env.PORT) || 3000;
+const MAX_PORT_RETRIES = 5;
 
 // --- Global Middlewares ---
 app.use(cors());
 app.use(express.json());
 
 // --- API Routes ---
+app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/fee-categories', feeCategoryRoutes);
 
 // Nested route: GET /api/students/:studentId/invoices
 app.get('/api/students/:studentId/invoices', InvoiceController.getByStudent);
@@ -35,6 +42,18 @@ app.get('/api/students/:studentId/invoices', InvoiceController.getByStudent);
 app.use(errorHandler);
 
 // --- Start Server ---
-app.listen(PORT, () => {
-  console.log(`🚀 Server SPP berjalan di http://localhost:${PORT}`);
-});
+function startServer(port, retriesLeft) {
+  const server = app.listen(port);
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE' && retriesLeft > 0) {
+      startServer(port + 1, retriesLeft - 1);
+      return;
+    }
+
+    process.stderr.write(`Server gagal dijalankan di port ${port}: ${error.message}\n`);
+    process.exit(1);
+  });
+}
+
+startServer(BASE_PORT, MAX_PORT_RETRIES);

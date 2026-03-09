@@ -11,9 +11,6 @@ function errorHandler(err, req, res, next) {
   // Tentukan status code (default 500 jika tidak di-set di error)
   const statusCode = err.statusCode || 500;
 
-  // Log error di server untuk debugging
-  console.error(`[ERROR] ${err.code || 'UNKNOWN_ERROR'}: ${err.message}`);
-
   // Kirim response JSON yang konsisten
   res.status(statusCode).json({
     success: false,

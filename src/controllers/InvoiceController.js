@@ -6,13 +6,27 @@ const InvoiceService = require('../services/InvoiceService');
 
 const InvoiceController = {
   /**
-   * POST /api/invoices — Generate tagihan baru.
-   * Body: { studentId, feeCategoryId, month, year }
+   * POST /api/invoices — Generate tagihan baru (single).
+   * Body sudah divalidasi oleh Zod middleware.
    */
   async create(req, res, next) {
     try {
       const { studentId, feeCategoryId, month, year } = req.body;
       const result = await InvoiceService.generate(studentId, feeCategoryId, month, year);
+      return res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * POST /api/invoices/bulk — Bulk generate tagihan untuk semua siswa aktif.
+   * Body sudah divalidasi oleh Zod middleware.
+   */
+  async bulkGenerate(req, res, next) {
+    try {
+      const { feeCategoryId, month, year } = req.body;
+      const result = await InvoiceService.generateBulk(feeCategoryId, month, year);
       return res.status(201).json({ success: true, data: result });
     } catch (error) {
       next(error);

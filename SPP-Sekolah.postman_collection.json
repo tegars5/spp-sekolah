@@ -1,0 +1,442 @@
+{
+  "info": {
+    "name": "SPP-Sekolah API",
+    "description": "Koleksi endpoint untuk testing API SPP-Sekolah di Postman.\n\nUrutan testing yang benar:\n1. Fee Category → buat kategori biaya dulu\n2. Student → daftarkan siswa\n3. Invoice → generate tagihan\n4. Payment → buat transaksi Midtrans",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "studentToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Auth (Login)",
+      "item": [
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.success) {",
+                  "    pm.environment.set(\"adminToken\", jsonData.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sekolah.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Student (Budi)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.success) {",
+                  "    pm.environment.set(\"studentToken\", jsonData.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"1234567890@student.sekolah.com\",\n  \"password\": \"1234567890\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Fee Category (Admin Only)",
+      "item": [
+        {
+          "name": "Tambah Fee Category - SPP Bulanan",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"SPP Bulanan\",\n  \"amount\": 500000,\n  \"description\": \"Biaya SPP bulanan siswa\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/fee-categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "fee-categories"]
+            }
+          }
+        },
+        {
+          "name": "Tambah Fee Category - Uang Gedung",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Uang Gedung\",\n  \"amount\": 2000000,\n  \"description\": \"Biaya pembangunan gedung sekolah\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/fee-categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "fee-categories"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Students (Admin Only)",
+      "item": [
+        {
+          "name": "Daftar Siswa Baru - Budi",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nisn\": \"1234567890\",\n  \"name\": \"Budi Santoso\",\n  \"className\": \"XII-IPA-1\",\n  \"phone\": \"081234567890\",\n  \"address\": \"Jl. Merdeka No. 10, Jakarta\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "students"]
+            }
+          }
+        },
+        {
+          "name": "Daftar Siswa Baru - Siti",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nisn\": \"0987654321\",\n  \"name\": \"Siti Nurhaliza\",\n  \"className\": \"XII-IPA-1\",\n  \"phone\": \"089876543210\",\n  \"address\": \"Jl. Sudirman No. 5, Jakarta\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "students"]
+            }
+          }
+        },
+        {
+          "name": "Daftar Siswa Baru - Ahmad",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nisn\": \"1122334455\",\n  \"name\": \"Ahmad Ridwan\",\n  \"className\": \"XII-IPS-2\",\n  \"phone\": \"081122334455\",\n  \"address\": \"Jl. Gatot Subroto No. 8, Jakarta\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "students"]
+            }
+          }
+        },
+        {
+          "name": "Ambil Semua Siswa",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "students"]
+            }
+          }
+        },
+        {
+          "name": "Detail Siswa (Admin/Student)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{studentToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "students", "1"]
+            }
+          }
+        },
+        {
+          "name": "❌ Test Validasi - Body Kosong",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "students"]
+            }
+          }
+        },
+        {
+          "name": "❌ Test Validasi - NISN Duplikat",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nisn\": \"1234567890\",\n  \"name\": \"Duplikat Budi\",\n  \"className\": \"XII-IPA-1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "students"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Invoices (Admin Only)",
+      "item": [
+        {
+          "name": "Generate Tagihan Single (Budi - SPP Januari)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": 1,\n  \"feeCategoryId\": 1,\n  \"month\": 1,\n  \"year\": 2026\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/invoices",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "invoices"]
+            }
+          }
+        },
+        {
+          "name": "❌ Anti-Double Billing (Tagihan sama lagi)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": 1,\n  \"feeCategoryId\": 1,\n  \"month\": 1,\n  \"year\": 2026\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/invoices",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "invoices"]
+            }
+          }
+        },
+        {
+          "name": "❌ Test Validasi - Month 13",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": 1,\n  \"feeCategoryId\": 1,\n  \"month\": 13,\n  \"year\": 2026\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/invoices",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "invoices"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Generate (SPP Februari - Semua Siswa)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feeCategoryId\": 1,\n  \"month\": 2,\n  \"year\": 2026\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/invoices/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "invoices", "bulk"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Generate (SPP Februari - Ulang, test skip)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feeCategoryId\": 1,\n  \"month\": 2,\n  \"year\": 2026\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/invoices/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "invoices", "bulk"]
+            }
+          }
+        },
+        {
+          "name": "Tagihan Siswa (Admin/Student)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{studentToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students/1/invoices",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "students", "1", "invoices"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Payments (Midtrans)",
+      "item": [
+        {
+          "name": "Buat Transaksi (Snap Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoiceId\": \"GANTI_DENGAN_INVOICE_ID_DARI_RESPONSE_SEBELUMNYA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/charge",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "charge"]
+            }
+          }
+        },
+        {
+          "name": "Simulate Webhook - Settlement (PAID)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"GANTI_DENGAN_ORDER_ID\",\n  \"transaction_status\": \"settlement\",\n  \"fraud_status\": \"accept\",\n  \"status_code\": \"200\",\n  \"gross_amount\": \"500000.00\",\n  \"signature_key\": \"GANTI_DENGAN_SIGNATURE\",\n  \"payment_type\": \"bank_transfer\",\n  \"transaction_id\": \"TXN-TEST-001\",\n  \"va_numbers\": [\n    { \"bank\": \"bca\", \"va_number\": \"1234567890\" }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/webhook",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "webhook"]
+            }
+          }
+        },
+        {
+          "name": "Simulate Webhook - Expire",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"GANTI_DENGAN_ORDER_ID\",\n  \"transaction_status\": \"expire\",\n  \"fraud_status\": \"accept\",\n  \"status_code\": \"407\",\n  \"gross_amount\": \"500000.00\",\n  \"signature_key\": \"GANTI_DENGAN_SIGNATURE\",\n  \"payment_type\": \"bank_transfer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/webhook",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "webhook"]
+            }
+          }
+        },
+        {
+          "name": "❌ Test Validasi - invoiceId kosong",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/charge",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "charge"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

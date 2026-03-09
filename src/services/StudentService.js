@@ -3,6 +3,7 @@
 // Sesuai architect.md: logika bisnis HANYA di Service, bukan di Controller.
 
 const prisma = require('../lib/prisma');
+const bcrypt = require('bcrypt');
 
 const StudentService = {
   /**
@@ -13,11 +14,7 @@ const StudentService = {
    */
   async register(data) {
     const { nisn, name, className, phone, address } = data;
-
-    // Validasi input dasar
-    if (!nisn || !name || !className) {
-      throw new Error('NISN, Nama, dan Kelas wajib diisi.');
-    }
+    // Input sudah divalidasi oleh Zod middleware (validators.js)
 
     // Cek apakah NISN sudah terdaftar (explicit check untuk pesan error yang ramah)
     const existing = await prisma.student.findUnique({
@@ -31,17 +28,37 @@ const StudentService = {
       throw error;
     }
 
-    const student = await prisma.student.create({
-      data: {
-        nisn,
-        name,
-        class: className, // 'class' adalah reserved word, mapping dari className
-        phone: phone || null,
-        address: address || null,
-      },
+    // Buat User dan Student secara ATOMIK menggunakan Prisma $transaction
+    // Password default siswa adalah NISN-nya sendiri
+    const hashedPassword = await bcrypt.hash(nisn, 10);
+    const email = `${nisn}@student.sekolah.com`;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Buat User untuk login
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          role: 'STUDENT',
+        },
+      });
+
+      // 2. Buat profil Student dan hubungkan dengan User
+      const student = await tx.student.create({
+        data: {
+          userId: user.id,
+          nisn,
+          name,
+          class: className, // 'class' adalah reserved word
+          phone: phone || null,
+          address: address || null,
+        },
+      });
+
+      return student;
     });
 
-    return student;
+    return result;
   },
 
   /**
